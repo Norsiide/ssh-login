@@ -14,7 +14,7 @@ curl -s "https://ipapi.co/${IP}/json/" > $TMPFILE
 
 # Timestamp ISO
 getCurrentTimestamp() { date -u --iso-8601=seconds; }
-
+ 
 SRV_HOSTNAME=$(hostname -f)
 SRV_IP=$(hostname -I | awk '{print $1}')
 
