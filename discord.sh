@@ -1,43 +1,121 @@
-#!/bin/sh
-BOTNAME="Julius"
-THUMBNAIL_URL="https://cdn-icons-png.flaticon.com/512/5064/5064910.png"
-AVATAR_URL="https://w7.pngwing.com/pngs/668/952/png-transparent-debian-arch-linux-computer-icons-desktop-linux-spiral-logo-magenta.png"
-WEBHOOK="DISCORD WEEBHOOK" # lien du webhook
-DATE=$(date +"%d-%m-%Y-%H:%M:%S")
-server="DEDICATED"
-USERID="<@!242990516843708416>"
-TMPFILE=$(mktemp)
+#!/bin/bash
 
-# Récupération IP
-IP=$(echo $SSH_CLIENT | awk '{ print $1 }')
-curl -s "https://ipapi.co/${IP}/json/" > $TMPFILE
+# ---------------------------
+# CONFIGURATION
+# ---------------------------
+DISCORD_WEBHOOK="URL_DU_WEBHOOK_DISCORD" # Webhook Discord
+SERVER="DEDICATED LOCAL"
+STATE_FILE="/opt/ssh-login/ssh_last"
+DATE=$(date +"%d-%m-%Y %H:%M:%S")
 
-# Timestamp ISO
-getCurrentTimestamp() { date -u --iso-8601=seconds; }
- 
+# ---------------------------
+# INFOS SERVEUR & UTILISATEUR
+# ---------------------------
+USER=$(whoami)
 SRV_HOSTNAME=$(hostname -f)
 SRV_IP=$(hostname -I | awk '{print $1}')
 
-# Construire description avec variables correctement
-DESCRIPTION="**Détails du serveur**\n🟢 Utilisateur: \`$(whoami)\`\n👤 Type de serveur: \`$server\`\n🖥️ HostName: \`$SRV_HOSTNAME\`\n🕐 Time: \`$DATE\`\n\n**Connexion IP**\n📡 IP: \`$IP\`\n📡 Whois: https://db-ip.com/$IP"
+# ---------------------------
+# TYPE DE CONNEXION
+# ---------------------------
+if [ -n "$SSH_CLIENT" ]; then
+    CONN_TYPE="SSH (client distant)"
+    IP=$(echo "$SSH_CLIENT" | awk '{print $1}')
+else
+    CONN_TYPE="LOCAL (machine)"
+    IP="127.0.0.1"
+fi
 
-# Envoi du webhook
-curl -s -H "Content-Type: application/json" -X POST --data "{
-    \"username\": \"$BOTNAME\",
-    \"avatar_url\": \"$AVATAR_URL\",
-    \"content\": \"🔔 Hey $USERID Nouvelle connexion **SSH**\",
-    \"embeds\": [{
-        \"color\": 12976176,
-        \"title\": \"SSH Login Détections\",
-        \"thumbnail\": { \"url\": \"$THUMBNAIL_URL\" },
-        \"author\": { \"name\": \"$BOTNAME\", \"icon_url\": \"$AVATAR_URL\" },
-        \"footer\": { \"icon_url\": \"$AVATAR_URL\", \"text\": \"$BOTNAME\" },
-        \"description\": \"$DESCRIPTION\",
-        \"timestamp\": \"$(getCurrentTimestamp)\"
-    }]
-}" $WEBHOOK > /dev/null
+# ---------------------------
+# TYPE UTILISATEUR
+# ---------------------------
+if [ "$USER" = "root" ]; then
+    USER_TYPE="⚠️ ROOT"
+else
+    USER_TYPE="👤 Utilisateur"
+fi
 
-# Suppression du fichier temporaire
-[ -e $TMPFILE ] && rm -f $TMPFILE
+# ---------------------------
+# GEOLOCALISATION IP
+# ---------------------------
+if [ "$IP" != "127.0.0.1" ]; then
+    IPINFO=$(curl -s --max-time 5 "https://ipapi.co/${IP}/json/")
+    COUNTRY=$(echo "$IPINFO" | jq -r '.country_name // "Inconnu"')
+    CITY=$(echo "$IPINFO" | jq -r '.city // "Inconnue"')
+    ISP=$(echo "$IPINFO" | jq -r '.org // "Inconnu"')
+else
+    COUNTRY="Local"
+    CITY="Machine"
+    ISP="Localhost"
+fi
 
+# ---------------------------
+# ANTI-SPAM
+# ---------------------------
+LAST_LINE=""
+[ -f "$STATE_FILE" ] && LAST_LINE=$(cat "$STATE_FILE")
 
+NEW_LINE="${USER}_${IP}_${DATE}"
+if [ "$NEW_LINE" = "$LAST_LINE" ]; then
+    exit 0
+fi
+echo "$NEW_LINE" > "$STATE_FILE"
+
+# ---------------------------
+# EMBED DISCORD
+# ---------------------------
+TITLE="🔔 Nouvelle connexion"
+COLOR=3066993 # Vert
+
+# 🚨 Alerte ROOT distant
+if [ "$USER" = "root" ] && [ "$CONN_TYPE" = "SSH (client distant)" ]; then
+    TITLE="🚨 ALERTE ROOT DISTANT 🚨"
+    COLOR=15158332 # Rouge
+fi
+
+PAYLOAD=$(jq -n \
+  --arg title "$TITLE" \
+  --arg user "$USER" \
+  --arg usertype "$USER_TYPE" \
+  --arg conn "$CONN_TYPE" \
+  --arg server "$SERVER" \
+  --arg host "$SRV_HOSTNAME" \
+  --arg srvip "$SRV_IP" \
+  --arg date "$DATE" \
+  --arg ip "$IP" \
+  --arg city "$CITY" \
+  --arg country "$COUNTRY" \
+  --arg isp "$ISP" \
+  --argjson color "$COLOR" \
+'{
+  embeds: [
+    {
+      title: $title,
+      color: $color,
+      fields: [
+        { "name": "👤 Utilisateur", "value": ("`" + $user + "`"), "inline": true },
+        { "name": "🆔 Type", "value": $usertype, "inline": true },
+        { "name": "🔐 Connexion", "value": ("`" + $conn + "`"), "inline": true },
+
+        { "name": "🖥️ Serveur", "value": ("`" + $server + "`"), "inline": true },
+        { "name": "🏷️ Hostname", "value": ("`" + $host + "`"), "inline": true },
+        { "name": "🌐 IP serveur", "value": ("`" + $srvip + "`"), "inline": true },
+
+        { "name": "📡 IP source", "value": ("`" + $ip + "`"), "inline": true },
+        { "name": "🌍 Localisation", "value": ($city + ", " + $country), "inline": true },
+        { "name": "🏢 Fournisseur", "value": ("`" + $isp + "`"), "inline": true }
+      ],
+      footer: {
+        text: ("⏰ " + $date)
+      }
+    }
+  ]
+}')
+
+# ---------------------------
+# ENVOI DISCORD
+# ---------------------------
+curl -s -H "Content-Type: application/json" \
+     -X POST \
+     -d "$PAYLOAD" \
+     "$DISCORD_WEBHOOK" >/dev/null
