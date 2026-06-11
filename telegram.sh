@@ -3,8 +3,8 @@
 # ---------------------------
 # CONFIGURATION
 # ---------------------------
-TELEGRAM_BOT_TOKEN="8127642052:AAHNu7qVqhKAAGLgy3zbNHWoQBXE_ZYcedA" # Remplacer par le token du bot
-TELEGRAM_CHAT_ID="-1003397949834"     # Remplacer par l'ID du chat/canal
+TELEGRAM_BOT_TOKEN="token" # Remplacer par le token du bot
+TELEGRAM_CHAT_ID="id-salon"     # Remplacer par l'ID du chat/canal
 SERVER="PROXMOX"
 STATE_FILE="/opt/ssh-login/ssh_last"
 DATE=$(date +"%d-%m-%Y %H:%M:%S")
