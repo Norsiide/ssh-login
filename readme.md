@@ -1,4 +1,4 @@
-<p align="center"><img src="https://norsiide.be/images/logo/logo.png" width="100" alt="norsiide"></p>
+<p align="center"><img src="https://norsiide.be/media-proxy/3/01KQG1PSN5X63RC6ZCKM2TDGFE.png" width="100" alt="norsiide"></p>
 
 # SSH login notifications
 
