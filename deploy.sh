@@ -2,4 +2,4 @@
 echo "
 #!/usr/bin/env bash
 # Log connection
-sh /opt/ssh-login/telegram.sh" > /etc/profile.d/ssh-alert.sh "
+sh /opt/ssh-login/telegram.sh" > /etc/profile.d/ssh-alert.sh
